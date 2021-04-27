@@ -302,12 +302,12 @@ void setup() {
       }
 
       case Packet::Command::BasicStatus: {
-        state.numberOfCells = packet->data.as_bytes[0];
+        state.numberOfCells       = packet->data.as_bytes[0];
         state.numberOfTempSensors = packet->data.as_bytes[1];
-        state.chargerEnabled = packet->data.as_bytes[2];
-        state.loadEnabled = packet->data.as_bytes[3];
-        state.stateOfDIDO = packet->data.as_bytes[4];
-        state.numberOfCycles = ((uint16_t)packet->data.as_bytes[5] << 0x08) | (uint16_t)packet->data.as_bytes[6];
+        state.chargerEnabled      = packet->data.as_bytes[2];
+        state.loadEnabled         = packet->data.as_bytes[3];
+        state.stateOfDIDO         = packet->data.as_bytes[4];
+        state.numberOfCycles      = ((uint16_t)packet->data.as_bytes[5] << 0x08) | (uint16_t)packet->data.as_bytes[6];
         break;
       }
 
