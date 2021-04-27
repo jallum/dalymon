@@ -91,11 +91,11 @@ void DalyBMS_init(DalyBMS* self) {
   bzero(self, sizeof(*self));
 }
 
-void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
+void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
   self->stats.totalBytesReceived++;
   switch (self->receiveState) {
     case DalyBMS::WaitingForPacketToStart: {
-      if (0xA5 != oneByte) {
+      if (0xA5 != theByte) {
         break;
       }
       
@@ -106,7 +106,7 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
     }
 
     case DalyBMS::WaitingForAddress: {
-      switch (oneByte) {
+      switch (theByte) {
         case Packet::Address::BMS:
         case Packet::Address::HOST: {
           /* Valid */
@@ -119,13 +119,13 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
         }
       }
       
-      self->packet.address = (Packet::Address)oneByte;
+      self->packet.address = (Packet::Address)theByte;
       self->receiveState = DalyBMS::WaitingForCommand;
       break;
     }
 
     case DalyBMS::WaitingForCommand: {
-      switch (oneByte) {
+      switch (theByte) {
         case Packet::Command::VoltageAndCurrent:
         case Packet::Command::MinMaxVoltage:
         case Packet::Command::MinMaxTemperature:
@@ -143,20 +143,20 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
         }
       }
 
-      self->packet.command = (Packet::Command)oneByte;
+      self->packet.command = (Packet::Command)theByte;
       self->receiveState = DalyBMS::WaitingForDataLength;
       break;
     }
 
     case DalyBMS::WaitingForDataLength: {
-      if (oneByte != sizeof(Packet::data)) {
-        self->packet.data_length = oneByte;
+      if (theByte != sizeof(Packet::data)) {
+        self->packet.data_length = theByte;
         self->receiveError = DalyBMS::InvalidDataLength;
         self->receiveState = DalyBMS::WaitingForPacketToStart;
         break;
       }
 
-      self->expectedDataBytes = oneByte;
+      self->expectedDataBytes = theByte;
       self->packet.data_length = 0;
       self->receiveState = DalyBMS::ReadingData;
       break;
@@ -164,7 +164,7 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
 
     case DalyBMS::ReadingData: {
       if (self->packet.data_length < sizeof(self->packet.data)) {
-        self->packet.data.as_bytes[self->packet.data_length++] = oneByte;
+        self->packet.data.as_bytes[self->packet.data_length++] = theByte;
       } else {
         self->receiveError = DalyBMS::DataOverflow;
       }
@@ -177,8 +177,8 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
 
     case DalyBMS::WaitingForChecksum: {
       if (DalyBMS::None == self->receiveError) {
-        self->packet.checksum = oneByte;
-        if (oneByte != Packet_computeChecksum(&self->packet)) {
+        self->packet.checksum = theByte;
+        if (theByte != Packet_computeChecksum(&self->packet)) {
           self->receiveError = DalyBMS::InvalidChecksum;
         } else {
           self->stats.packetsReceived++;
@@ -195,7 +195,7 @@ void DalyBMS_receiveOneByte(DalyBMS* self, const uint8_t oneByte) {
 
 void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
   while (stream->available()) {
-    DalyBMS_receiveOneByte(self, stream->read());
+    DalyBMS_receivetheByte(self, stream->read());
   }
 }
 
