@@ -1,5 +1,7 @@
 
 
+namespace Daly {
+
 typedef struct __attribute__((packed)) {
   uint8_t magic;
   enum Address : uint8_t {
@@ -22,7 +24,10 @@ typedef struct __attribute__((packed)) {
     uint8_t as_bytes[0x08];
   } data;
   uint8_t checksum;
-} Packet;
+} Frame;
+  
+};
+
 
 uint8_t compute_checksum(uint8_t* buffer, size_t length) {
   uint8_t* p = buffer;
@@ -34,29 +39,29 @@ uint8_t compute_checksum(uint8_t* buffer, size_t length) {
   return checksum;
 }
 
-void Packet_clear(Packet* p) {
-  bzero(p, sizeof(Packet));
+void DalyFrame_clear(Daly::Frame* p) {
+  bzero(p, sizeof(Daly::Frame));
 }
 
-void Packet_reset(Packet* p, Packet::Address address, Packet::Command command) {
-  Packet_clear(p);
+void DalyFrame_reset(Daly::Frame* p, Daly::Frame::Address address, Daly::Frame::Command command) {
+  DalyFrame_clear(p);
   p->magic = 0xA5;
   p->address = address;
   p->command = command;
   p->data_length = 0x08;
 }
 
-uint8_t Packet_computeChecksum(Packet* self) {
-  // Compute the checksum for every byte of the packet except the last one, the checksum byte itself.
-  return compute_checksum((uint8_t*)self, sizeof(Packet) - 1);
+uint8_t DalyFrame_computeChecksum(Daly::Frame* self) {
+  // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
+  return compute_checksum((uint8_t*)self, sizeof(Daly::Frame) - 1);
 }
 
-void Packet_applyChecksum(Packet* self) {
-  self->checksum = Packet_computeChecksum(self);
+void DalyFrame_applyChecksum(Daly::Frame* self) {
+  self->checksum = DalyFrame_computeChecksum(self);
 }
 
-void Packet_printToStream(Packet* self, Stream* stream) {
-  for (size_t i = 0; i < sizeof(Packet); i++) {
+void DalyFrame_printToStream(Daly::Frame* self, Stream* stream) {
+  for (size_t i = 0; i < sizeof(Daly::Frame); i++) {
     char buffer[0x10];
     
     sprintf(buffer, "%02x", *(((char*)self) + i));
@@ -67,10 +72,10 @@ void Packet_printToStream(Packet* self, Stream* stream) {
 
 
 typedef struct DalyBMS {
-  typedef void PacketReceiver(Packet* packet, struct DalyBMS* fromBMS);
-  Packet packet;
+  typedef void DalyFrameReceiver(Daly::Frame* frame, struct DalyBMS* fromBMS);
+  Daly::Frame frame;
   enum ReceiveState : uint8_t {
-    WaitingForPacketToStart,
+    WaitingForFrameToStart,
     WaitingForAddress,
     WaitingForCommand,
     WaitingForDataLength,
@@ -86,7 +91,7 @@ typedef struct DalyBMS {
     InvalidChecksum
   } receiveError;
   uint8_t expectedDataBytes;
-  PacketReceiver* onPacketReceived;
+  DalyFrameReceiver* onFrameReceived;
 } DalyBMS;
 
 void DalyBMS_init(DalyBMS* self) {
@@ -95,22 +100,22 @@ void DalyBMS_init(DalyBMS* self) {
 
 void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
   switch (self->receiveState) {
-    case DalyBMS::WaitingForPacketToStart: {
+    case DalyBMS::WaitingForFrameToStart: {
       if (0xA5 != theByte) {
         break;
       }
       
       self->receiveState = DalyBMS::WaitingForAddress;
       self->receiveError = DalyBMS::None;
-      Packet_clear(&self->packet);
-      self->packet.magic = theByte;
+      DalyFrame_clear(&self->frame);
+      self->frame.magic = theByte;
       break;
     }
 
     case DalyBMS::WaitingForAddress: {
       switch (theByte) {
-        case Packet::Address::BMS:
-        case Packet::Address::HOST: {
+        case Daly::Frame::Address::BMS:
+        case Daly::Frame::Address::HOST: {
           /* Valid */
           break;
         }
@@ -121,22 +126,22 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
         }
       }
       
-      self->packet.address = (Packet::Address)theByte;
+      self->frame.address = (Daly::Frame::Address)theByte;
       self->receiveState = DalyBMS::WaitingForCommand;
       break;
     }
 
     case DalyBMS::WaitingForCommand: {
       switch (theByte) {
-        case Packet::Command::VoltageAndCurrent:
-        case Packet::Command::MinMaxVoltage:
-        case Packet::Command::MinMaxTemperature:
-        case Packet::Command::ChargeDischargeStatus:
-        case Packet::Command::BasicStatus:
-        case Packet::Command::VoltagesByCell:
-        case Packet::Command::TempsBySensor:
-        case Packet::Command::BalancerStatus:
-        case Packet::Command::FailureFlags:
+        case Daly::Frame::Command::VoltageAndCurrent:
+        case Daly::Frame::Command::MinMaxVoltage:
+        case Daly::Frame::Command::MinMaxTemperature:
+        case Daly::Frame::Command::ChargeDischargeStatus:
+        case Daly::Frame::Command::BasicStatus:
+        case Daly::Frame::Command::VoltagesByCell:
+        case Daly::Frame::Command::TempsBySensor:
+        case Daly::Frame::Command::BalancerStatus:
+        case Daly::Frame::Command::FailureFlags:
           /* Valid */
           break;
           
@@ -146,33 +151,33 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
         }
       }
 
-      self->packet.command = (Packet::Command)theByte;
+      self->frame.command = (Daly::Frame::Command)theByte;
       self->receiveState = DalyBMS::WaitingForDataLength;
       break;
     }
 
     case DalyBMS::WaitingForDataLength: {
-      if (theByte != sizeof(Packet::data)) {
-        self->packet.data_length = theByte;
+      if (theByte != sizeof(Daly::Frame::data)) {
+        self->frame.data_length = theByte;
         self->receiveError = DalyBMS::InvalidDataLength;
-        self->receiveState = DalyBMS::WaitingForPacketToStart;
+        self->receiveState = DalyBMS::WaitingForFrameToStart;
         break;
       }
 
       self->expectedDataBytes = theByte;
-      self->packet.data_length = 0;
+      self->frame.data_length = 0;
       self->receiveState = DalyBMS::ReadingData;
       break;
     }
 
     case DalyBMS::ReadingData: {
-      if (self->packet.data_length < sizeof(self->packet.data)) {
-        self->packet.data.as_bytes[self->packet.data_length++] = theByte;
+      if (self->frame.data_length < sizeof(self->frame.data)) {
+        self->frame.data.as_bytes[self->frame.data_length++] = theByte;
       } else {
         self->receiveError = DalyBMS::DataOverflow;
       }
 
-      if (self->packet.data_length == self->expectedDataBytes) {
+      if (self->frame.data_length == self->expectedDataBytes) {
         self->receiveState = DalyBMS::WaitingForChecksum;
       }
       break;
@@ -180,16 +185,16 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
 
     case DalyBMS::WaitingForChecksum: {
       if (DalyBMS::None == self->receiveError) {
-        self->packet.checksum = theByte;
-        if (theByte != Packet_computeChecksum(&self->packet)) {
+        self->frame.checksum = theByte;
+        if (theByte != DalyFrame_computeChecksum(&self->frame)) {
           self->receiveError = DalyBMS::InvalidChecksum;
         } else {
-          if (self->onPacketReceived) {
-            self->onPacketReceived(&self->packet, self);
+          if (self->onFrameReceived) {
+            self->onFrameReceived(&self->frame, self);
           }
         }
       }
-      self->receiveState = DalyBMS::WaitingForPacketToStart;
+      self->receiveState = DalyBMS::WaitingForFrameToStart;
       break;
     }
   }
@@ -201,11 +206,11 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
   }
 }
 
-void DalyBMS_sendCommandToStream(DalyBMS* self, Packet::Command command, Stream* stream) {
-  Packet packet;
-  Packet_reset(&packet, Packet::Address::HOST, command);
-  Packet_applyChecksum(&packet);
-  stream->write((byte*)&packet, sizeof(packet));
+void DalyBMS_sendCommandToStream(DalyBMS* self, Daly::Frame::Command command, Stream* stream) {
+  Daly::Frame frame;
+  DalyFrame_reset(&frame, Daly::Frame::Address::HOST, command);
+  DalyFrame_applyChecksum(&frame);
+  stream->write((byte*)&frame, sizeof(frame));
   stream->flush();
 }
 
@@ -333,7 +338,7 @@ typedef struct State {
 #define BMS_UART Serial1
 
 typedef struct Task {
-  Packet::Command commandToRun;
+  Daly::Frame::Command commandToRun;
   uint16_t intervalInMillis;
   uint32_t executeAt;
   uint32_t lastRunAt;
@@ -341,10 +346,10 @@ typedef struct Task {
 } Task;
 
 Task tasks[] = {
-  { Packet::Command::VoltagesByCell,    1000 },
-  { Packet::Command::VoltageAndCurrent, 1000 },
-  { Packet::Command::BasicStatus,       2000 },
-  { Packet::Command::FailureFlags,      5000 },
+  { Daly::Frame::Command::VoltagesByCell,    1000 },
+  { Daly::Frame::Command::VoltageAndCurrent, 1000 },
+  { Daly::Frame::Command::BasicStatus,       2000 },
+  { Daly::Frame::Command::FailureFlags,      5000 },
   { /* EMPTY */ }
 };
 
@@ -356,100 +361,100 @@ void setup() {
   BMS_UART.begin(9600);
 
   DalyBMS_init(&bms);
-  bms.onPacketReceived = [](Packet* packet, DalyBMS* fromBMS) {
+  bms.onFrameReceived = [](Daly::Frame* frame, DalyBMS* fromBMS) {
     uint32_t now = millis();
 
     Task* t = tasks;
     while (t->commandToRun) {
-      if (t->commandToRun == packet->command) {
+      if (t->commandToRun == frame->command) {
         t->lastReplyAt = now;
         break;
       }
       t++;
     }
 
-    switch (packet->command) {
-      case Packet::Command::VoltageAndCurrent: {
-        state.packVoltage   = ((uint16_t)packet->data.as_bytes[0] << 0x08) | ((uint16_t)packet->data.as_bytes[1]);
-        state.current       = (((int16_t)packet->data.as_bytes[4] << 0x08) | (int16_t)packet->data.as_bytes[5]) - 30000;
-        state.stateOfCharge = ((uint16_t)packet->data.as_bytes[6] << 0x08) | ((uint16_t)packet->data.as_bytes[7]);
+    switch (frame->command) {
+      case Daly::Frame::Command::VoltageAndCurrent: {
+        state.packVoltage   = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
+        state.current       = (((int16_t)frame->data.as_bytes[4] << 0x08) | (int16_t)frame->data.as_bytes[5]) - 30000;
+        state.stateOfCharge = ((uint16_t)frame->data.as_bytes[6] << 0x08) | ((uint16_t)frame->data.as_bytes[7]);
         break;
       }
 
-      case Packet::Command::MinMaxVoltage: {
-        state.cellMaxVoltage      = ((uint16_t)packet->data.as_bytes[0] << 0x08) | ((uint16_t)packet->data.as_bytes[1]);
-        state.cellWithMaxVoltage  = packet->data.as_bytes[2];
-        state.cellMinVoltage      = ((uint16_t)packet->data.as_bytes[3] << 0x08) | ((uint16_t)packet->data.as_bytes[4]);
-        state.cellWithMinVoltage  = packet->data.as_bytes[5];
+      case Daly::Frame::Command::MinMaxVoltage: {
+        state.cellMaxVoltage      = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
+        state.cellWithMaxVoltage  = frame->data.as_bytes[2];
+        state.cellMinVoltage      = ((uint16_t)frame->data.as_bytes[3] << 0x08) | ((uint16_t)frame->data.as_bytes[4]);
+        state.cellWithMinVoltage  = frame->data.as_bytes[5];
         break;
       }
 
-      case Packet::Command::MinMaxTemperature: {
-        state.cellMaxTemp       = (int16_t)packet->data.as_bytes[0] - 40;
-        state.cellWithMaxTemp   = packet->data.as_bytes[1];
-        state.cellMinTemp       = (int16_t)packet->data.as_bytes[2] - 40;
-        state.cellWithMinTemp   = packet->data.as_bytes[3];
+      case Daly::Frame::Command::MinMaxTemperature: {
+        state.cellMaxTemp       = (int16_t)frame->data.as_bytes[0] - 40;
+        state.cellWithMaxTemp   = frame->data.as_bytes[1];
+        state.cellMinTemp       = (int16_t)frame->data.as_bytes[2] - 40;
+        state.cellWithMinTemp   = frame->data.as_bytes[3];
         break;
       }
 
-      case Packet::Command::ChargeDischargeStatus: {
-        state.chargeDischargeStatus   = (State::ChargeDischargeStatus)packet->data.as_bytes[0];
-        state.chargeFETsEnabled       = packet->data.as_bytes[1];
-        state.dischargeFETsEnabled    = packet->data.as_bytes[2];
-        state.bmsLife                 = packet->data.as_bytes[3];
-        state.remainingCapacityInMAh  = ((uint32_t)packet->data.as_bytes[4] << 0x18) | ((uint32_t)packet->data.as_bytes[5] << 0x10) | ((uint32_t)packet->data.as_bytes[6] << 0x08) | (uint32_t)packet->data.as_bytes[7];
+      case Daly::Frame::Command::ChargeDischargeStatus: {
+        state.chargeDischargeStatus   = (State::ChargeDischargeStatus)frame->data.as_bytes[0];
+        state.chargeFETsEnabled       = frame->data.as_bytes[1];
+        state.dischargeFETsEnabled    = frame->data.as_bytes[2];
+        state.bmsLife                 = frame->data.as_bytes[3];
+        state.remainingCapacityInMAh  = ((uint32_t)frame->data.as_bytes[4] << 0x18) | ((uint32_t)frame->data.as_bytes[5] << 0x10) | ((uint32_t)frame->data.as_bytes[6] << 0x08) | (uint32_t)frame->data.as_bytes[7];
         break;
       }
 
-      case Packet::Command::BasicStatus: {
-        state.numberOfCells       = packet->data.as_bytes[0];
-        state.numberOfTempSensors = packet->data.as_bytes[1];
-        state.chargerEnabled      = packet->data.as_bytes[2];
-        state.loadEnabled         = packet->data.as_bytes[3];
-        state.stateOfDIDO         = packet->data.as_bytes[4];
-        state.numberOfCycles      = ((uint16_t)packet->data.as_bytes[5] << 0x08) | (uint16_t)packet->data.as_bytes[6];
+      case Daly::Frame::Command::BasicStatus: {
+        state.numberOfCells       = frame->data.as_bytes[0];
+        state.numberOfTempSensors = frame->data.as_bytes[1];
+        state.chargerEnabled      = frame->data.as_bytes[2];
+        state.loadEnabled         = frame->data.as_bytes[3];
+        state.stateOfDIDO         = frame->data.as_bytes[4];
+        state.numberOfCycles      = ((uint16_t)frame->data.as_bytes[5] << 0x08) | (uint16_t)frame->data.as_bytes[6];
         break;
       }
 
-      case Packet::Command::VoltagesByCell: {
-        uint8_t frameNumber = packet->data.as_bytes[0];
+      case Daly::Frame::Command::VoltagesByCell: {
+        uint8_t frameNumber = frame->data.as_bytes[0];
         if (frameNumber == 0xFF) {
           break;
         }
         uint8_t firstCell = frameNumber * 3;
         for (int i = 0; i < 3; i++) {
-          state.voltageByCell[firstCell + i] = ((uint16_t)packet->data.as_bytes[1 + (i << 1)] << 0x08) | (uint16_t)packet->data.as_bytes[2 + (i << 1)];
+          state.voltageByCell[firstCell + i] = ((uint16_t)frame->data.as_bytes[1 + (i << 1)] << 0x08) | (uint16_t)frame->data.as_bytes[2 + (i << 1)];
         }
         break;
       }
 
-      case Packet::Command::TempsBySensor: {
-        uint8_t frameNumber = packet->data.as_bytes[0];
+      case Daly::Frame::Command::TempsBySensor: {
+        uint8_t frameNumber = frame->data.as_bytes[0];
         if (frameNumber == 0xFF) {
           break;
         }
         uint8_t firstCell = frameNumber * 7;
         for (int i = 0; i < 7; i++) {
-          state.tempBySensor[firstCell + i] = (int8_t)packet->data.as_bytes[i] - 40;
+          state.tempBySensor[firstCell + i] = (int8_t)frame->data.as_bytes[i] - 40;
         }
         break;
       }
 
-      case Packet::Command::BalancerStatus: {
+      case Daly::Frame::Command::BalancerStatus: {
         for (int i = 0; i < 6; i++) {
-          state.balancerStateByCell[i] = packet->data.as_bytes[i];
+          state.balancerStateByCell[i] = frame->data.as_bytes[i];
         }
         break;
       }
 
-      case Packet::Command::FailureFlags: {
-        memcpy(&state.failureFlags, packet->data.as_bytes, sizeof(state.failureFlags));
+      case Daly::Frame::Command::FailureFlags: {
+        memcpy(&state.failureFlags, frame->data.as_bytes, sizeof(state.failureFlags));
         break;
       }
     }
 
     MONITOR.print("<- ");
-    Packet_printToStream(packet, &MONITOR);
+    DalyFrame_printToStream(frame, &MONITOR);
     MONITOR.print("-- ");
     if (t->commandToRun) {
       MONITOR.print(" RA: ");
