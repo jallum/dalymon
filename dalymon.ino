@@ -15,7 +15,7 @@ typedef struct __attribute__((packed)) {
     VoltagesByCell        = 0x95,
     TempsBySensor         = 0x96,
     BalancerStatus        = 0x97,
-    Faults                = 0x77, // FIXME
+    FailureFlags          = 0x98,
   } command;
   uint8_t data_length;
   union {
@@ -136,7 +136,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
         case Packet::Command::VoltagesByCell:
         case Packet::Command::TempsBySensor:
         case Packet::Command::BalancerStatus:
-        case Packet::Command::Faults:
+        case Packet::Command::FailureFlags:
           /* Valid */
           break;
           
@@ -255,7 +255,76 @@ typedef struct State {
 
   /**/
   uint8_t balancerStateByCell[0x30 / 8];
-  
+
+  /**/
+  struct {
+    /* 0x00 */
+    uint8_t levelOneCellVoltageTooHigh : 1;
+    uint8_t levelTwoCellVoltageTooHigh : 1;
+    uint8_t levelOneCellVoltageTooLow : 1;
+    uint8_t levelTwoCellVoltageTooLow : 1;
+    uint8_t levelOnePackVoltageTooHigh : 1;
+    uint8_t levelTwoPackVoltageTooHigh : 1;
+    uint8_t levelOnePackVoltageTooLow : 1;
+    uint8_t levelTwoPackVoltageTooLow : 1;
+
+    /* 0x01 */
+    uint8_t levelOneChargeTempTooHigh : 1;
+    uint8_t levelTwoChargeTempTooHigh : 1;
+    uint8_t levelOneChargeTempTooLow : 1;
+    uint8_t levelTwoChargeTempTooLow : 1;
+    uint8_t levelOneDischargeTempTooHigh : 1;
+    uint8_t levelTwoDischargeTempTooHigh : 1;
+    uint8_t levelOneDischargeTempTooLow : 1;
+    uint8_t levelTwoDischargeTempTooLow : 1;
+
+    /* 0x02 */
+    uint8_t levelOneChargeCurrentTooHigh : 1;
+    uint8_t levelTwoChargeCurrentTooHigh : 1;
+    uint8_t levelOneDischargeCurrentTooHigh : 1;
+    uint8_t levelTwoDischargeCurrentTooHigh : 1;
+    uint8_t levelOneStateOfChargeTooHigh : 1;
+    uint8_t levelTwoStateOfChargeTooHigh : 1;
+    uint8_t levelOneStateOfChargeTooLow : 1;
+    uint8_t levelTwoStateOfChargeTooLow : 1;
+
+    /* 0x03 */
+    uint8_t levelOneCellVoltageDifferenceTooHigh : 1;
+    uint8_t levelTwoCellVoltageDifferenceTooHigh : 1;
+    uint8_t levelOneTempSensorDifferenceTooHigh : 1;
+    uint8_t levelTwoTempSensorDifferenceTooHigh : 1;
+    uint8_t _reserved1 : 4;
+
+    /* 0x04 */
+    uint8_t chargeFETTemperatureTooHigh : 1;
+    uint8_t dischargeFETTemperatureTooHigh : 1;
+    uint8_t failureOfChargeFETTemperatureSensor : 1;
+    uint8_t failureOfDischargeFETTemperatureSensor : 1;
+    uint8_t failureOfChargeFETAdhesion : 1;
+    uint8_t failureOfDischargeFETAdhesion : 1;
+    uint8_t failureOfChargeFETTBreaker : 1;
+    uint8_t failureOfDischargeFETBreaker : 1;
+
+    /* 0x05 */
+    uint8_t failureOfAFEAcquisitionModule : 1;
+    uint8_t failureOfVoltageSensorModule : 1;
+    uint8_t failureOfTemperatureSensorModule : 1;
+    uint8_t failureOfEEPROMStorageModule : 1;
+    uint8_t failureOfRealtimeClockModule : 1;
+    uint8_t failureOfPrechargeModule : 1;
+    uint8_t failureOfVehicleCommunicationModule : 1;
+    uint8_t failureOfIntranetCommunicationModule : 1;
+
+    /* 0x06 */            
+    uint8_t failureOfCurrentSensorModule : 1;
+    uint8_t failureOfMainVoltageSensorModule : 1;
+    uint8_t failureOfShortCircuitProtection : 1;
+    uint8_t failureOfLowVoltageNoCharging : 1;
+    uint8_t _reserved2 : 4;
+
+    /* 0x07 */
+    uint8_t faultCode;
+  } failureFlags;
 } State;
 
 
@@ -275,7 +344,7 @@ Task tasks[] = {
   { Packet::Command::VoltagesByCell,    1000 },
   { Packet::Command::VoltageAndCurrent, 1000 },
   { Packet::Command::BasicStatus,       2000 },
-//  { Packet::Command::Faults,            200  },
+  { Packet::Command::FailureFlags,      5000 },
   { /* EMPTY */ }
 };
 
@@ -373,8 +442,8 @@ void setup() {
         break;
       }
 
-      case Packet::Command::Faults: {
-        // TODO
+      case Packet::Command::FailureFlags: {
+        memcpy(&state.failureFlags, packet->data.as_bytes, sizeof(state.failureFlags));
         break;
       }
     }
@@ -383,7 +452,7 @@ void setup() {
     Packet_printToStream(packet, &MONITOR);
     MONITOR.print("-- ");
     if (t->commandToRun) {
-      MONITOR.print("RA: ");
+      MONITOR.print(" RA: ");
       MONITOR.print(t->lastRunAt);
       MONITOR.print(", RTT: ");
       MONITOR.print(t->lastReplyAt - t->lastRunAt);
