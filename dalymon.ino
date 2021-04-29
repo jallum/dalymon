@@ -2,7 +2,7 @@
 
 namespace Daly {
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed)) Frame {
   uint8_t magic;
   enum Address : uint8_t {
     BMS   = 0x01,
@@ -24,53 +24,54 @@ typedef struct __attribute__((packed)) {
     uint8_t as_bytes[0x08];
   } data;
   uint8_t checksum;
-} Frame;
 
-static uint8_t compute_checksum(uint8_t* buffer, size_t length) {
-  uint8_t* p = buffer;
-  uint8_t* pe = buffer + length;
-  uint8_t checksum = 0;
-  while (p < pe) {
-    checksum += *p++;
+  Frame() {
+    this->magic = 0xA5;
+    this->data_length = 0x08;
   }
-  return checksum;
-}
 
-void Frame_clear(Frame* p) {
-  bzero(p, sizeof(Frame));
-}
+  Frame(Address address, Command command) : Frame() {
+    this->address = address;
+    this->command = command;
+  }
 
-void Frame_reset(Frame* p, Frame::Address address, Frame::Command command) {
-  Frame_clear(p);
-  p->magic = 0xA5;
-  p->address = address;
-  p->command = command;
-  p->data_length = 0x08;
-}
+  void clear() {
+    bzero(this, sizeof(Frame));
+  }
 
-uint8_t Frame_computeChecksum(Frame* self) {
-  // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
-  return compute_checksum((uint8_t*)self, sizeof(Frame) - 1);
-}
+  static uint8_t compute_checksum(uint8_t* buffer, size_t length) {
+    uint8_t* p = buffer;
+    uint8_t* pe = buffer + length;
+    uint8_t checksum = 0;
+    while (p < pe) {
+      checksum += *p++;
+    }
+    return checksum;
+  }
 
-void Frame_applyChecksum(Frame* self) {
-  self->checksum = Frame_computeChecksum(self);
-}
+  uint8_t computeChecksum() {
+    // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
+    return compute_checksum((uint8_t*)this, sizeof(Frame) - 1);
+  }
+  
+  void applyChecksum() {
+    this->checksum = computeChecksum();
+  }
+
+  void printToStream(Stream* stream) {
+    for (size_t i = 0; i < sizeof(Frame); i++) {
+      char buffer[0x10];
+      
+      sprintf(buffer, "%02x", *(((char*)this) + i));
+      stream->print(buffer);
+      stream->print(" ");
+    }
+  }
+
+} Frame;
 
 };
 
-
-
-
-void DalyFrame_printToStream(Daly::Frame* self, Stream* stream) {
-  for (size_t i = 0; i < sizeof(Daly::Frame); i++) {
-    char buffer[0x10];
-    
-    sprintf(buffer, "%02x", *(((char*)self) + i));
-    stream->print(buffer);
-    stream->print(" ");
-  }
-}
 
 
 typedef struct DalyBMS {
@@ -109,7 +110,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
       
       self->receiveState = DalyBMS::WaitingForAddress;
       self->receiveError = DalyBMS::None;
-      Daly::Frame_clear(&self->frame);
+      self->frame.clear();
       self->frame.magic = theByte;
       break;
     }
@@ -188,7 +189,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
     case DalyBMS::WaitingForChecksum: {
       if (DalyBMS::None == self->receiveError) {
         self->frame.checksum = theByte;
-        if (theByte != Daly::Frame_computeChecksum(&self->frame)) {
+        if (theByte != self->frame.computeChecksum()) {
           self->receiveError = DalyBMS::InvalidChecksum;
         } else {
           if (self->onFrameReceived) {
@@ -209,9 +210,8 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
 }
 
 void DalyBMS_sendCommandToStream(DalyBMS* self, Daly::Frame::Command command, Stream* stream) {
-  Daly::Frame frame;
-  Daly::Frame_reset(&frame, Daly::Frame::Address::HOST, command);
-  Daly::Frame_applyChecksum(&frame);
+  Daly::Frame frame(Daly::Frame::Address::HOST, command);
+  frame.applyChecksum();
   stream->write((byte*)&frame, sizeof(frame));
   stream->flush();
 }
@@ -456,7 +456,7 @@ void setup() {
     }
 
     MONITOR.print("<- ");
-    DalyFrame_printToStream(frame, &MONITOR);
+    frame->printToStream(&MONITOR);
     MONITOR.print("-- ");
     if (t->commandToRun) {
       MONITOR.print(" RA: ");
