@@ -14,7 +14,8 @@ typedef struct __attribute__((packed)) {
     BasicStatus           = 0x94,
     VoltagesByCell        = 0x95,
     TempsBySensor         = 0x96,
-    BalancerStatus        = 0x97
+    BalancerStatus        = 0x97,
+    Faults                = 0x77, // FIXME
   } command;
   uint8_t data_length;
   union {
@@ -85,11 +86,6 @@ typedef struct DalyBMS {
     InvalidChecksum
   } receiveError;
   uint8_t expectedDataBytes;
-  struct {
-    uint32_t totalBytesReceived;
-    uint32_t packetsReceived;
-    uint32_t packetsTransmitted;
-  } stats;
   PacketReceiver* onPacketReceived;
 } DalyBMS;
 
@@ -98,7 +94,6 @@ void DalyBMS_init(DalyBMS* self) {
 }
 
 void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
-  self->stats.totalBytesReceived++;
   switch (self->receiveState) {
     case DalyBMS::WaitingForPacketToStart: {
       if (0xA5 != theByte) {
@@ -141,6 +136,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
         case Packet::Command::VoltagesByCell:
         case Packet::Command::TempsBySensor:
         case Packet::Command::BalancerStatus:
+        case Packet::Command::Faults:
           /* Valid */
           break;
           
@@ -188,7 +184,6 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
         if (theByte != Packet_computeChecksum(&self->packet)) {
           self->receiveError = DalyBMS::InvalidChecksum;
         } else {
-          self->stats.packetsReceived++;
           if (self->onPacketReceived) {
             self->onPacketReceived(&self->packet, self);
           }
@@ -268,9 +263,24 @@ typedef struct State {
 #define MONITOR  Serial
 #define BMS_UART Serial1
 
+typedef struct Task {
+  Packet::Command commandToRun;
+  uint16_t intervalInMillis;
+  uint32_t executeAt;
+  uint32_t lastRunAt;
+  uint32_t lastReplyAt;
+} Task;
+
+Task tasks[] = {
+  { Packet::Command::VoltagesByCell,    1000 },
+  { Packet::Command::VoltageAndCurrent, 1000 },
+  { Packet::Command::BasicStatus,       2000 },
+//  { Packet::Command::Faults,            200  },
+  { /* EMPTY */ }
+};
+
 static DalyBMS bms;
 static State state;
-static uint32_t nextCommandAt;
 
 void setup() {
   MONITOR.begin(115200);
@@ -278,10 +288,16 @@ void setup() {
 
   DalyBMS_init(&bms);
   bms.onPacketReceived = [](Packet* packet, DalyBMS* fromBMS) {
-    MONITOR.print("<- ");
-    Packet_printToStream(packet, &MONITOR);
-    MONITOR.print(" -- ");    
-    MONITOR.println(bms.stats.packetsReceived);
+    uint32_t now = millis();
+
+    Task* t = tasks;
+    while (t->commandToRun) {
+      if (t->commandToRun == packet->command) {
+        t->lastReplyAt = now;
+        break;
+      }
+      t++;
+    }
 
     switch (packet->command) {
       case Packet::Command::VoltageAndCurrent: {
@@ -356,20 +372,42 @@ void setup() {
         }
         break;
       }
-    }
-  };
 
-  nextCommandAt = millis() + 5000;
+      case Packet::Command::Faults: {
+        // TODO
+        break;
+      }
+    }
+
+    MONITOR.print("<- ");
+    Packet_printToStream(packet, &MONITOR);
+    MONITOR.print("-- ");
+    if (t->commandToRun) {
+      MONITOR.print("RA: ");
+      MONITOR.print(t->lastRunAt);
+      MONITOR.print(", RTT: ");
+      MONITOR.print(t->lastReplyAt - t->lastRunAt);
+      MONITOR.print("ms");
+    }
+    MONITOR.println(); 
+    MONITOR.flush();
+  };
 }
 
 void loop() {
   uint32_t now = millis();
-  if (nextCommandAt < now) {
-    MONITOR.println(now);
-    nextCommandAt += 500;
-
-    DalyBMS_sendCommandToStream(&bms, Packet::Command::MinMaxVoltage, &BMS_UART);
+  if (now < 5000) {
+    return;
   }
-
+  
+  for (Task* t = tasks; t->commandToRun; t++) {
+    if (t->executeAt <= now) {
+      DalyBMS_sendCommandToStream(&bms, t->commandToRun, &BMS_UART);
+      t->lastRunAt = now;
+      t->executeAt = now + t->intervalInMillis;
+      break;
+    }
+  }
+  
   DalyBMS_readAvailableBytesFromStream(&bms, &BMS_UART);
 }
