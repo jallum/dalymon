@@ -25,11 +25,8 @@ typedef struct __attribute__((packed)) {
   } data;
   uint8_t checksum;
 } Frame;
-  
-};
 
-
-uint8_t compute_checksum(uint8_t* buffer, size_t length) {
+static uint8_t compute_checksum(uint8_t* buffer, size_t length) {
   uint8_t* p = buffer;
   uint8_t* pe = buffer + length;
   uint8_t checksum = 0;
@@ -39,21 +36,25 @@ uint8_t compute_checksum(uint8_t* buffer, size_t length) {
   return checksum;
 }
 
-void DalyFrame_clear(Daly::Frame* p) {
-  bzero(p, sizeof(Daly::Frame));
+void Frame_clear(Frame* p) {
+  bzero(p, sizeof(Frame));
 }
 
-void DalyFrame_reset(Daly::Frame* p, Daly::Frame::Address address, Daly::Frame::Command command) {
-  DalyFrame_clear(p);
+void Frame_reset(Frame* p, Frame::Address address, Frame::Command command) {
+  Frame_clear(p);
   p->magic = 0xA5;
   p->address = address;
   p->command = command;
   p->data_length = 0x08;
 }
 
+};
+
+
+
 uint8_t DalyFrame_computeChecksum(Daly::Frame* self) {
   // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
-  return compute_checksum((uint8_t*)self, sizeof(Daly::Frame) - 1);
+  return Daly::compute_checksum((uint8_t*)self, sizeof(Daly::Frame) - 1);
 }
 
 void DalyFrame_applyChecksum(Daly::Frame* self) {
@@ -107,7 +108,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
       
       self->receiveState = DalyBMS::WaitingForAddress;
       self->receiveError = DalyBMS::None;
-      DalyFrame_clear(&self->frame);
+      Daly::Frame_clear(&self->frame);
       self->frame.magic = theByte;
       break;
     }
@@ -208,7 +209,7 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
 
 void DalyBMS_sendCommandToStream(DalyBMS* self, Daly::Frame::Command command, Stream* stream) {
   Daly::Frame frame;
-  DalyFrame_reset(&frame, Daly::Frame::Address::HOST, command);
+  Daly::Frame_reset(&frame, Daly::Frame::Address::HOST, command);
   DalyFrame_applyChecksum(&frame);
   stream->write((byte*)&frame, sizeof(frame));
   stream->flush();
