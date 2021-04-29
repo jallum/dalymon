@@ -48,18 +48,19 @@ void Frame_reset(Frame* p, Frame::Address address, Frame::Command command) {
   p->data_length = 0x08;
 }
 
+uint8_t Frame_computeChecksum(Frame* self) {
+  // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
+  return compute_checksum((uint8_t*)self, sizeof(Frame) - 1);
+}
+
+void Frame_applyChecksum(Frame* self) {
+  self->checksum = Frame_computeChecksum(self);
+}
+
 };
 
 
 
-uint8_t DalyFrame_computeChecksum(Daly::Frame* self) {
-  // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
-  return Daly::compute_checksum((uint8_t*)self, sizeof(Daly::Frame) - 1);
-}
-
-void DalyFrame_applyChecksum(Daly::Frame* self) {
-  self->checksum = DalyFrame_computeChecksum(self);
-}
 
 void DalyFrame_printToStream(Daly::Frame* self, Stream* stream) {
   for (size_t i = 0; i < sizeof(Daly::Frame); i++) {
@@ -187,7 +188,7 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
     case DalyBMS::WaitingForChecksum: {
       if (DalyBMS::None == self->receiveError) {
         self->frame.checksum = theByte;
-        if (theByte != DalyFrame_computeChecksum(&self->frame)) {
+        if (theByte != Daly::Frame_computeChecksum(&self->frame)) {
           self->receiveError = DalyBMS::InvalidChecksum;
         } else {
           if (self->onFrameReceived) {
@@ -210,7 +211,7 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
 void DalyBMS_sendCommandToStream(DalyBMS* self, Daly::Frame::Command command, Stream* stream) {
   Daly::Frame frame;
   Daly::Frame_reset(&frame, Daly::Frame::Address::HOST, command);
-  DalyFrame_applyChecksum(&frame);
+  Daly::Frame_applyChecksum(&frame);
   stream->write((byte*)&frame, sizeof(frame));
   stream->flush();
 }
