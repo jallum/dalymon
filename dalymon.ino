@@ -199,6 +199,16 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
   }
 }
 
+void DalyBMS_sendCommandToStream(DalyBMS* self, Packet::Command command, Stream* stream) {
+  Packet packet;
+  Packet_reset(&packet);
+  packet.address = Packet::Address::HOST;
+  packet.command = command;
+  Packet_applyChecksum(&packet);
+  stream->write((byte*)&packet, sizeof(packet));
+  stream->flush();
+}
+
 
 typedef struct State {
   /**/
@@ -353,15 +363,7 @@ void loop() {
     MONITOR.println(now);
     nextCommandAt += 500;
 
-    static uint8_t testPacket[] = { 0xa5, 0x40, 0x93, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF };
-    Packet_applyChecksum((Packet*)&testPacket);
-
-    MONITOR.print("-> ");
-    Packet_printToStream((Packet*)&testPacket, &MONITOR);
-    MONITOR.println();
-
-    BMS_UART.write(testPacket, sizeof(testPacket));
-    BMS_UART.flush();
+    DalyBMS_sendCommandToStream(&bms, Packet::Command::MinMaxVoltage, &BMS_UART);
   }
 
   DalyBMS_readAvailableBytesFromStream(&bms, &BMS_UART);
