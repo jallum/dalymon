@@ -33,9 +33,15 @@ uint8_t compute_checksum(uint8_t* buffer, size_t length) {
   return checksum;
 }
 
-void Packet_reset(Packet* p) {
+void Packet_clear(Packet* p) {
   bzero(p, sizeof(Packet));
+}
+
+void Packet_reset(Packet* p, Packet::Address address, Packet::Command command) {
+  Packet_clear(p);
   p->magic = 0xA5;
+  p->address = address;
+  p->command = command;
   p->data_length = 0x08;
 }
 
@@ -101,7 +107,8 @@ void DalyBMS_receivetheByte(DalyBMS* self, const uint8_t theByte) {
       
       self->receiveState = DalyBMS::WaitingForAddress;
       self->receiveError = DalyBMS::None;
-      Packet_reset(&self->packet);
+      Packet_clear(&self->packet);
+      self->packet.magic = theByte;
       break;
     }
 
@@ -201,9 +208,7 @@ void DalyBMS_readAvailableBytesFromStream(DalyBMS* self, Stream* stream) {
 
 void DalyBMS_sendCommandToStream(DalyBMS* self, Packet::Command command, Stream* stream) {
   Packet packet;
-  Packet_reset(&packet);
-  packet.address = Packet::Address::HOST;
-  packet.command = command;
+  Packet_reset(&packet, Packet::Address::HOST, command);
   Packet_applyChecksum(&packet);
   stream->write((byte*)&packet, sizeof(packet));
   stream->flush();
