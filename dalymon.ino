@@ -364,7 +364,5 @@ void loop() {
     BMS_UART.flush();
   }
 
-  if (BMS_UART.available()) {
-    DalyBMS_readAvailableBytesFromStream(&bms, &BMS_UART);
-  }
+  DalyBMS_readAvailableBytesFromStream(&bms, &BMS_UART);
 }
