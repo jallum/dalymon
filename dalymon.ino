@@ -75,10 +75,10 @@ typedef struct Module {
     uint8_t levelTwoChargeCurrentTooHigh : 1;
     uint8_t levelOneDischargeCurrentTooHigh : 1;
     uint8_t levelTwoDischargeCurrentTooHigh : 1;
-    uint8_t levelOneModuleOfChargeTooHigh : 1;
-    uint8_t levelTwoModuleOfChargeTooHigh : 1;
-    uint8_t levelOneModuleOfChargeTooLow : 1;
-    uint8_t levelTwoModuleOfChargeTooLow : 1;
+    uint8_t levelOneStateOfChargeTooHigh : 1;
+    uint8_t levelTwoStateOfChargeTooHigh : 1;
+    uint8_t levelOneStateOfChargeTooLow : 1;
+    uint8_t levelTwoStateOfChargeTooLow : 1;
 
     /* 0x03 */
     uint8_t levelOneCellVoltageDifferenceTooHigh : 1;
