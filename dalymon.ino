@@ -162,44 +162,44 @@ void setup() {
 
     switch (frame->command) {
       case Daly::Frame::Command::VoltageAndCurrent: {
-        module.voltage   = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
-        module.current       = (((int16_t)frame->data.as_bytes[4] << 0x08) | (int16_t)frame->data.as_bytes[5]) - 30000;
-        module.stateOfCharge = ((uint16_t)frame->data.as_bytes[6] << 0x08) | ((uint16_t)frame->data.as_bytes[7]);
+        module.voltage        = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
+        module.current        = (((int16_t)frame->data.as_bytes[4] << 0x08) | (int16_t)frame->data.as_bytes[5]) - 30000;
+        module.stateOfCharge  = ((uint16_t)frame->data.as_bytes[6] << 0x08) | ((uint16_t)frame->data.as_bytes[7]);
         break;
       }
 
       case Daly::Frame::Command::MinMaxVoltage: {
-        module.cellMaxVoltage      = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
-        module.cellWithMaxVoltage  = frame->data.as_bytes[2];
-        module.cellMinVoltage      = ((uint16_t)frame->data.as_bytes[3] << 0x08) | ((uint16_t)frame->data.as_bytes[4]);
-        module.cellWithMinVoltage  = frame->data.as_bytes[5];
+        module.cellMaxVoltage     = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
+        module.cellWithMaxVoltage = frame->data.as_bytes[2];
+        module.cellMinVoltage     = ((uint16_t)frame->data.as_bytes[3] << 0x08) | ((uint16_t)frame->data.as_bytes[4]);
+        module.cellWithMinVoltage = frame->data.as_bytes[5];
         break;
       }
 
       case Daly::Frame::Command::MinMaxTemperature: {
-        module.cellMaxTemp       = (int16_t)frame->data.as_bytes[0] - 40;
-        module.cellWithMaxTemp   = frame->data.as_bytes[1];
-        module.cellMinTemp       = (int16_t)frame->data.as_bytes[2] - 40;
-        module.cellWithMinTemp   = frame->data.as_bytes[3];
+        module.cellMaxTemp      = (int16_t)frame->data.as_bytes[0] - 40;
+        module.cellWithMaxTemp  = frame->data.as_bytes[1];
+        module.cellMinTemp      = (int16_t)frame->data.as_bytes[2] - 40;
+        module.cellWithMinTemp  = frame->data.as_bytes[3];
         break;
       }
 
       case Daly::Frame::Command::ChargeDischargeStatus: {
-        module.chargeDischargeStatus   = (Module::ChargeDischargeStatus)frame->data.as_bytes[0];
-        module.chargeFETsEnabled       = frame->data.as_bytes[1];
-        module.dischargeFETsEnabled    = frame->data.as_bytes[2];
-        module.bmsLife                 = frame->data.as_bytes[3];
-        module.remainingCapacityInMAh  = ((uint32_t)frame->data.as_bytes[4] << 0x18) | ((uint32_t)frame->data.as_bytes[5] << 0x10) | ((uint32_t)frame->data.as_bytes[6] << 0x08) | (uint32_t)frame->data.as_bytes[7];
+        module.chargeDischargeStatus  = (Module::ChargeDischargeStatus)frame->data.as_bytes[0];
+        module.chargeFETsEnabled      = frame->data.as_bytes[1];
+        module.dischargeFETsEnabled   = frame->data.as_bytes[2];
+        module.bmsLife                = frame->data.as_bytes[3];
+        module.remainingCapacityInMAh = ((uint32_t)frame->data.as_bytes[4] << 0x18) | ((uint32_t)frame->data.as_bytes[5] << 0x10) | ((uint32_t)frame->data.as_bytes[6] << 0x08) | (uint32_t)frame->data.as_bytes[7];
         break;
       }
 
       case Daly::Frame::Command::BasicStatus: {
-        module.numberOfCells       = frame->data.as_bytes[0];
-        module.numberOfTempSensors = frame->data.as_bytes[1];
-        module.chargerEnabled      = frame->data.as_bytes[2];
-        module.loadEnabled         = frame->data.as_bytes[3];
-        module.stateOfDIDO         = frame->data.as_bytes[4];
-        module.numberOfCycles      = ((uint16_t)frame->data.as_bytes[5] << 0x08) | (uint16_t)frame->data.as_bytes[6];
+        module.numberOfCells        = frame->data.as_bytes[0];
+        module.numberOfTempSensors  = frame->data.as_bytes[1];
+        module.chargerEnabled       = frame->data.as_bytes[2];
+        module.loadEnabled          = frame->data.as_bytes[3];
+        module.stateOfDIDO          = frame->data.as_bytes[4];
+        module.numberOfCycles       = ((uint16_t)frame->data.as_bytes[5] << 0x08) | (uint16_t)frame->data.as_bytes[6];
         break;
       }
 
