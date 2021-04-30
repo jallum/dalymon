@@ -144,6 +144,17 @@ static Daly::Protocol protocol;
 static Daly::UARTPort port(&BMS_UART, &protocol);
 static Module module;
 
+Task* taskForCommand(Daly::Frame::Command command) {
+  Task* t = tasks;
+  while (t->commandToRun) {
+    if (t->commandToRun == command) {
+      return t;
+    }
+    t++;
+  }
+  return NULL;
+}
+
 void setup() {
   MONITOR.begin(115200);
   BMS_UART.begin(9600);
@@ -151,13 +162,9 @@ void setup() {
   protocol.onFrameReceived = [](Daly::Frame* frame, Daly::Protocol* source) {
     uint32_t now = millis();
 
-    Task* t = tasks;
-    while (t->commandToRun) {
-      if (t->commandToRun == frame->command) {
-        t->lastReplyAt = now;
-        break;
-      }
-      t++;
+    Task* t = taskForCommand(frame->command);
+    if (t) {
+      t->lastReplyAt = now;
     }
 
     switch (frame->command) {
@@ -243,7 +250,7 @@ void setup() {
     MONITOR.print("<- ");
     frame->printToStream(&MONITOR);
     MONITOR.print("-- ");
-    if (t->commandToRun) {
+    if (t) {
       MONITOR.print(" RA: ");
       MONITOR.print(t->lastRunAt);
       MONITOR.print(", RTT: ");
