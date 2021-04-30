@@ -4,7 +4,7 @@
 
 typedef struct Module {
   /**/
-  uint16_t packVoltage;
+  uint16_t voltage;
   int16_t current;
   uint16_t stateOfCharge;
 
@@ -29,7 +29,7 @@ typedef struct Module {
   uint8_t chargeFETsEnabled;
   uint8_t dischargeFETsEnabled;
   uint8_t bmsLife;
-  uint32_t remainingCapacityInMAh;
+  uint32_t remainingCapacityInMAh;  
 
   /**/
   uint8_t numberOfCells;
@@ -162,7 +162,7 @@ void setup() {
 
     switch (frame->command) {
       case Daly::Frame::Command::VoltageAndCurrent: {
-        module.packVoltage   = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
+        module.voltage   = ((uint16_t)frame->data.as_bytes[0] << 0x08) | ((uint16_t)frame->data.as_bytes[1]);
         module.current       = (((int16_t)frame->data.as_bytes[4] << 0x08) | (int16_t)frame->data.as_bytes[5]) - 30000;
         module.stateOfCharge = ((uint16_t)frame->data.as_bytes[6] << 0x08) | ((uint16_t)frame->data.as_bytes[7]);
         break;
