@@ -133,10 +133,10 @@ typedef struct Task {
 } Task;
 
 Task tasks[] = {
-  { Daly::Frame::Command::VoltagesByCell,    1000 },
-  { Daly::Frame::Command::VoltageAndCurrent, 1000 },
-  { Daly::Frame::Command::BasicStatus,       2000 },
   { Daly::Frame::Command::FailureFlags,      5000 },
+  { Daly::Frame::Command::BasicStatus,       2000 },
+  { Daly::Frame::Command::VoltageAndCurrent, 1000 },
+  { Daly::Frame::Command::VoltagesByCell,     500 },
   { /* EMPTY */ }
 };
 
@@ -145,12 +145,19 @@ static Daly::UARTPort port(&BMS_UART, &protocol);
 static Module module;
 
 Task* taskForCommand(Daly::Frame::Command command) {
-  Task* t = tasks;
-  while (t->commandToRun) {
+  for (Task* t = tasks; t->commandToRun; t++) {
     if (t->commandToRun == command) {
       return t;
     }
-    t++;
+  }
+  return NULL;
+}
+
+Task* taskToRunNext(uint32_t now) {
+  for (Task* t = tasks; t->commandToRun; t++) {
+    if (t->executeAt <= now) {
+      return t;
+    }
   }
   return NULL;
 }
@@ -249,14 +256,14 @@ void setup() {
 
     MONITOR.print("<- ");
     frame->printToStream(&MONITOR);
-    MONITOR.print("-- ");
-    if (t) {
-      MONITOR.print(" RA: ");
-      MONITOR.print(t->lastRunAt);
-      MONITOR.print(", RTT: ");
-      MONITOR.print(t->lastReplyAt - t->lastRunAt);
-      MONITOR.print("ms");
-    }
+//    MONITOR.print("-- ");
+//    if (t) {
+//      MONITOR.print(" RA: ");
+//      MONITOR.print(t->lastRunAt);
+//      MONITOR.print(", RTT: ");
+//      MONITOR.print(t->lastReplyAt - t->lastRunAt);
+//      MONITOR.print("ms");
+//    }
     MONITOR.println(); 
     MONITOR.flush();
   };
@@ -267,15 +274,14 @@ void loop() {
   if (now < 5000) {
     return;
   }
-  
-  for (Task* t = tasks; t->commandToRun; t++) {
-    if (t->executeAt <= now) {
-      port.sendCommand(t->commandToRun);
-      t->lastRunAt = now;
-      t->executeAt = now + t->intervalInMillis;
-      break;
-    }
+
+  Task* t = taskToRunNext(now);
+  if (t && port.availableToSend()) {
+    port.sendCommand(t->commandToRun);
+    t->lastRunAt = now;
+    t->executeAt = now + t->intervalInMillis;
   }
-  
+
+  port.sendPendingBytes();
   port.receiveAvailableBytes();
 }

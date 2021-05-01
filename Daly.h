@@ -28,6 +28,7 @@ public:
   Frame(Address address, Command command);
 
   void clear();
+  void reset(Address address, Command command);
   uint8_t computeChecksum();
   void applyChecksum();
   void printToStream(Stream* stream);
@@ -65,9 +66,13 @@ public:
 class UARTPort {
   Stream* uart;
   Protocol* protocol;
+  Frame frame;
+  uint8_t bytesLeftToSend;
   
 public:
   UARTPort(Stream* uart, Protocol* protocol);
+  size_t sendPendingBytes();
+  bool availableToSend();
   void sendCommand(Frame::Command command);
   void receiveAvailableBytes();
 };

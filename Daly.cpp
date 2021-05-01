@@ -27,6 +27,14 @@ void Frame::clear() {
   bzero(this, sizeof(Frame));
 }
 
+void Frame::reset(Address address, Command command) {
+  clear();
+  this->magic = 0xA5;
+  this->address = address;
+  this->command = command;
+  this->dataLength = 0x08;
+}
+
 uint8_t Frame::computeChecksum() {
   // Compute the checksum for every byte of the frame except the last one, the checksum byte itself.
   return compute_checksum((uint8_t*)this, sizeof(Frame) - 1);
@@ -158,10 +166,10 @@ UARTPort::UARTPort(Stream* uart, Protocol* protocol) {
 }
 
 void UARTPort::sendCommand(Daly::Frame::Command command) {
-  Frame frame(Frame::Address::HOST, command);
-  frame.applyChecksum();
-  uart->write((byte*)&frame, sizeof(frame));
-  uart->flush();
+  this->frame.reset(Frame::Address::HOST, command);
+  this->frame.applyChecksum();
+  this->bytesLeftToSend = sizeof(Frame);
+  this->sendPendingBytes();
 }
 
 void UARTPort::receiveAvailableBytes() {
@@ -170,5 +178,20 @@ void UARTPort::receiveAvailableBytes() {
   }
 }
 
+size_t UARTPort::sendPendingBytes() {
+  if (this->bytesLeftToSend == 0) {
+    return 0;
+  }
+  
+  int offset = sizeof(Frame) - this->bytesLeftToSend;
+  int count = uart->write(((byte*)&frame) + offset, min(this->bytesLeftToSend, this->uart->availableForWrite()));
+  this->bytesLeftToSend -= count;
+
+  return count;
+}
+
+bool UARTPort::availableToSend() {
+  return (this->bytesLeftToSend == 0) && this->uart->availableForWrite();
+}
 
 };
