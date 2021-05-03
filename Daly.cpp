@@ -91,6 +91,9 @@ void Protocol::receiveByte(const uint8_t theByte) {
 
     case ReceiveState::WaitingForCommand: {
       switch (theByte) {
+        case Frame::Command::NominalCapacityAndCellVoltage:
+        case Frame::Command::AlarmThresholdsForPackVoltage:
+        case Frame::Command::AlarmThresholdsForPackCurrent:
         case Frame::Command::VoltageAndCurrent:
         case Frame::Command::MinMaxVoltage:
         case Frame::Command::MinMaxTemperature:

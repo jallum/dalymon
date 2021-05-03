@@ -7,15 +7,18 @@ typedef struct __attribute__((packed)) Frame {
     HOST  = 0x40,
   } address;
   enum Command : uint8_t {
-    VoltageAndCurrent     = 0x90,
-    MinMaxVoltage         = 0x91,
-    MinMaxTemperature     = 0x92,
-    ChargeDischargeStatus = 0x93,
-    BasicStatus           = 0x94,
-    VoltagesByCell        = 0x95,
-    TempsBySensor         = 0x96,
-    BalancerStatus        = 0x97,
-    FailureFlags          = 0x98,
+    NominalCapacityAndCellVoltage = 0x50,
+    AlarmThresholdsForPackVoltage = 0x5A,
+    AlarmThresholdsForPackCurrent = 0x5B,
+    VoltageAndCurrent             = 0x90,
+    MinMaxVoltage                 = 0x91,
+    MinMaxTemperature             = 0x92,
+    ChargeDischargeStatus         = 0x93,
+    BasicStatus                   = 0x94,
+    VoltagesByCell                = 0x95,
+    TempsBySensor                 = 0x96,
+    BalancerStatus                = 0x97,
+    FailureFlags                  = 0x98,
   } command;
   uint8_t dataLength;
   union {
